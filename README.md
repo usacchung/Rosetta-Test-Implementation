@@ -1,36 +1,66 @@
-# Rosetta-Test-Implementation
+# Rosetta-Test-Implementation: Hardening Bioconductor Wrappers
 
-This repository contains my implementation of the **Easy**, **Medium**, and **Hard** qualification tests for the **Rosetta** project. 
+This repository contains the official qualification test implementation for the **Rosetta** project (GSoC 2026). It demonstrates a production-ready approach to bridging **Python (Pandas)** and **R (Bioconductor/DESeq2)** using `rpy2`, with a focus on system stability, statistical accuracy, and environment reproducibility.
 
-## Overview
-The goal of these tests is to demonstrate the ability to bridge the gap between **Python (Pandas)** and **R (Bioconductor/DESeq2)** using `rpy2`, while ensuring a robust and reproducible development environment.
+## 1. Overview
+The implementation fulfills the **Easy, Medium, and Hard** qualification requirements. It introduces a defensive wrapping layer for `deseq2` that serves as a prototype for the proposed **Three-Tier API Architecture** (Quick Defaults, Granular Control, and R Escape Hatch).
 
-## Environment & Reproducibility
-To resolve system-level dependencies and shared library linking issues (`libR.so`), I developed a **Dockerized workflow** based on Ubuntu 22.04.
+## 2. Environment & Reproducibility
+To resolve complex ABI symbol linking issues (e.g., `libR.so` / `R_getVar`) and ensure cross-platform stability, this project is fully containerized.
 
-### How to Run
-1. **Build the Docker Image:**
+* **Base OS:** Ubuntu 22.04 LTS
+* **R Stack:** R 4.4.2 + Bioconductor (DESeq2, airway)
+* **Python Stack:** Python 3.10.12 + rpy2 3.5.1 + Pytest
+
+### 3. How to Run
+1. **Build the Image (Takes ~10 mins):**
    ```bash
-   docker build -t rosetta-test .
-2. **Execute Hard Test (Unit Testing):**
+   docker build -t rosetta-test
+2. **Run with Volume Mapping (Sync user's local files with the container):**
    ```bash
-   docker run -it -v $(pwd):/app rosetta-test pytest hard_test.py
-3. **Execute Medium Test (Biological Validation):**
+   # This allows user to edit files on user's host and run them instantly in Docker
+   docker run -it -v $(pwd):/app rosetta-test
+3. **Execute Tests Inside the Container:**
    ```bash
-   docker run -it -v $(pwd):/app rosetta-test python3 medium_test.py
+   # Easy Test: Basic Environment Verification
+   python3 easy_test.py
 
-## Technical Challenges Resolved
-During the implementation, I identified and resolved several critical hurdles:
+   # Medium Test: Biological Data Validation (Airway Dataset)
+   python3 medium_test.py
 
-Pandas 2.x Compatibility: Implemented a monkey patch for pd.DataFrame.iteritems to support modern Python data stacks where this method is deprecated.
+   # Hard Test: Robust Wrapper Validation with Pytest
+   pytest hard_test.py
 
-S4 Object Interoperability: Managed complex DESeq2 RS4 classes by using robjects.globalenv and explicit type coercion (as.vector) to satisfy R method signatures for dispersions<-.
+## 4. Technical Challenges & Solutions
+During development, I implemented several "hardening" solutions to ensure the interface is robust enough for production bioinformatics pipelines:
 
-Edge Case Fitting: Customized the DESeq2 workflow (estimateDispersionsGeneEst) to handle low-variance simulated datasets, ensuring 100% test coverage even in extreme edge cases.
+* **ABI & Environment Hardening:** I solved a `libR.so` linking error (`R_getVar` symbol not found) in the Docker. I configured `LD_LIBRARY_PATH` and `R_HOME` in a correct way. This can make sure that Rosetta function the same in isolated containerized workflows.
 
-## Results
-Easy Test: Basic R environment verification (Success).
+* **Pandas 2.0+ Compatibility:** I used a Monkey Patch to solve a regression problem, where `rpy2`'s conversion layer fails on latest Pandas version, due to the removal of the iteritems() method. Through redirecting iteritems to items with a Monkey Patch, I can make sure Rosetta maintains compatibility with modern data stacks.
 
-Medium Test: Successfully processed the airway dataset and matched Bioconductor's statistical output in Python.
+* **S4 Object Manipulation:** I solved a complex issue that `rpy2` mapped R vectors to Python arrays incorrectly. There were signature mismatches in R's S4 method dispatch, specifically for `dispersions<-`. As a result, I used `robjects.globalenv` and explicit R type coercion, `as.vector`, to keep the integrity of the DESeq DataSet object.
 
-Hard Test: Implemented defensive programming with input validation and achieved 2 passed in pytest.
+* **Defensive Programming Layer:** In order to prevent R from crashes, I added pre-processing logic in Python to validate count matrices for non-negative integers and factor consistency, which means that I decided to completed these tasks in Python  before passing data to the R-API.
+
+## 5. Results
+* **Easy Test:** I verified the basic Bioconductor infrastructure, to ensure that `DESeq2` and its dependencies are linked with each other and accessible within the Docker container.
+
+* **Medium Test:** I executed a full differential expression analysis with the `airway` dataset. I confirmed that the result tables which are generated by Python are the same as the gold-standard Bioconductor outputs for baseMean, log2FoldChange, and pvalue.
+
+* **Hard Test:** I developed a `deseq2` wrapper using `rpy2`, validated different input including non-negative integer counts and matching sample names. Besides, I validated the workflow with 3 pytest cases. The test stress-test the stability of the code by simulating datasets, including edge cases such as very small sample size and very low variance.
+
+## 6. Repository Structure
+* **`Dockerfile:`** Standardized environment definition for reproducibility.
+
+* **`easy_test.py:`** Environment and dependency linkage check.
+
+* **`medium_test.py:`** Biological validation using the `airway` dataset.
+
+* **`hard_test.py:`** Full implementation of the `deseq2` wrapper and unit tests.
+
+* **`README.md:`** Project documentation and execution guide.
+
+#
+**Contributor:** Catherine Chi Chung
+
+**Project: Rosetta:** Python wrappers for Bioconductor packages via rpy2 (GSoC 2026)
