@@ -23,7 +23,7 @@ To resolve complex ABI symbol linking issues (e.g., `libR.so` / `R_getVar`) and 
 3. **Execute Tests Inside the Container:**
    ```bash
    # Easy Test: Basic Environment Verification
-   python3 easy_test.py
+   python3 easy_test.R
 
    # Medium Test: Biological Data Validation (Airway Dataset)
    python3 medium_test.py
@@ -52,7 +52,7 @@ During development, I implemented several "hardening" solutions to ensure the in
 ## 6. Repository Structure
 * **`Dockerfile:`** Standardized environment definition for reproducibility.
 
-* **`easy_test.py:`** Environment and dependency linkage check.
+* **`easy_test.R:`** Environment and dependency linkage check.
 
 * **`medium_test.py:`** Biological validation using the `airway` dataset.
 
