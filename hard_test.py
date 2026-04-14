@@ -6,7 +6,6 @@ Environment: R 4.4.2, Python 3.10.12
 The script validates the Tier 1 API prototype and makes sure robust
 data exchange between Pandas and Bioconductor S4 objects
 """
-# TODO: Extend support for custom contrast matrices in Tier 2 API (Phase 1)
 
 import os
 import pandas as pd
@@ -42,6 +41,11 @@ def deseq2(counts, metadata, design):
     # 2. Index consistency check
     if not all(counts.columns == metadata.index):
         raise ValueError("Sample names (counts columns) must match metadata index")
+    
+    # 3. Design formula validation
+    design_factor = design.replace('~', '').strip()
+    if design_factor not in metadata.columns:
+        raise ValueError(f"Design factor '{design_factor}' not found in metadata columns")
 
     # Initialize Bioconductor packages
     deseq2_pkg = importr('DESeq2')
@@ -105,3 +109,18 @@ def test_validation_mismatched_samples():
     meta = pd.DataFrame({'cond': ['A', 'B']}, index=['sample_X', 'sample_Y'])
     with pytest.raises(ValueError, match="Sample names.*must match"):
         deseq2(counts, meta, "~ cond")
+
+def test_validation_float_counts():
+    """Make sure the script can stop non integer input, to avoid wrong calculate in R"""
+    counts = pd.DataFrame({'s1': [10.5, 20], 's2': [11, 21]}, index=['G1', 'G2'])
+    meta = pd.DataFrame({'cond': ['A', 'B']}, index=['s1', 's2'])
+    with pytest.raises(ValueError, match="Counts must be integers"):
+        deseq2(counts, meta, "~ cond")
+
+def test_validation_missing_design_column():
+    """Test for not existing column name"""
+    counts = pd.DataFrame({'s1': [10, 20], 's2': [11, 21]}, index=['G1', 'G2'])
+    meta = pd.DataFrame({'cond': ['A', 'B']}, index=['s1', 's2'])
+    # provide a not existing column name 'treatment'
+    with pytest.raises(ValueError, match="not found in metadata columns"):
+        deseq2(counts, meta, "~ treatment")
